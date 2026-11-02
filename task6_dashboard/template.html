@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Netflix Insights Dashboard</title>
+<style>
+  :root { --red:#E50914; --dark:#221F1F; --bg:#f5f5f7; --card:#fff; --muted:#6b6b6b; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Inter, "Segoe UI", system-ui, sans-serif; background:var(--bg); color:var(--dark); }
+  header { background:var(--dark); color:#fff; padding:28px 24px; }
+  header h1 { margin:0; font-size:1.7rem; } header h1 b { color:var(--red); }
+  header p { margin:6px 0 0; color:#bbb; }
+  main { max-width:1300px; margin:0 auto; padding:20px 16px 48px; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:20px; }
+  .kpi { background:var(--card); border-radius:12px; padding:16px; border-top:4px solid var(--red); box-shadow:0 1px 3px #0001; }
+  .kpi span { display:block; font-size:1.7rem; font-weight:700; }
+  .kpi small { color:var(--muted); text-transform:uppercase; letter-spacing:.05em; font-size:.75rem; }
+  h2 { margin:28px 0 12px; font-size:1.2rem; border-left:4px solid var(--red); padding-left:10px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,560px),1fr)); gap:14px; }
+  .card { background:var(--card); border-radius:12px; padding:8px; box-shadow:0 1px 3px #0001; min-width:0; }
+  .note { color:var(--muted); font-size:.9rem; padding:0 10px 8px; }
+  .rec-box { background:var(--card); border-radius:12px; padding:18px; box-shadow:0 1px 3px #0001; }
+  .rec-box input { width:100%; padding:12px 14px; font-size:1rem; border:2px solid #ddd; border-radius:8px; }
+  .rec-box input:focus { outline:none; border-color:var(--red); }
+  #recs { list-style:none; padding:0; margin:14px 0 0; display:grid; gap:8px; }
+  #recs li { display:flex; justify-content:space-between; gap:12px; padding:10px 12px; background:var(--bg); border-radius:8px; }
+  #recs small { color:var(--muted); display:block; }
+  #recs .score { font-weight:700; color:var(--red); white-space:nowrap; }
+  ol.biz { padding-left:0; list-style:none; counter-reset:b; display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr)); gap:12px; }
+  ol.biz li { counter-increment:b; background:var(--card); border-radius:12px; padding:16px 16px 16px 56px; position:relative; box-shadow:0 1px 3px #0001; }
+  ol.biz li::before { content:counter(b); position:absolute; left:16px; top:16px; width:28px; height:28px; border-radius:50%; background:var(--red); color:#fff; display:grid; place-items:center; font-weight:700; }
+  ol.biz p { margin:6px 0 0; color:#444; line-height:1.45; }
+  footer { text-align:center; color:var(--muted); font-size:.8rem; padding:20px; }
+</style>
+</head>
+<body>
+<header>
+  <h1><b>NETFLIX</b> Content Insights Dashboard</h1>
+  <p>Analytics, machine learning and business insights from 8.8k Netflix titles (data to Sep 2021)</p>
+</header>
+<main>
+  <div class="kpis">{{KPIS}}</div>
+
+  <h2>Growth & forecast</h2>
+  <div class="grid">
+    <div class="card">{{FIG_YEARLY}}</div>
+    <div class="card">{{FIG_FORECAST}}<div class="note">{{FC_NOTE}}</div></div>
+  </div>
+
+  <h2>What's in the catalogue</h2>
+  <div class="grid">
+    <div class="card">{{FIG_COUNTRIES}}</div>
+    <div class="card">{{FIG_GENRES}}</div>
+    <div class="card">{{FIG_MOMENTUM}}</div>
+    <div class="card">{{FIG_RATINGS}}</div>
+    <div class="card">{{FIG_DURATION}}</div>
+    <div class="card">{{FIG_CLF}}<div class="note">{{CLF_NOTE}}</div></div>
+  </div>
+
+  <h2>Try the recommender</h2>
+  <div class="rec-box">
+    <input id="q" list="titles" placeholder="Type a title, e.g. Stranger Things, Narcos, The Irishman…" autocomplete="off">
+    <datalist id="titles"></datalist>
+    <ul id="recs"></ul>
+  </div>
+
+  <h2>Business recommendations</h2>
+  <ol class="biz">{{RECS}}</ol>
+</main>
+<footer>Auspify Data Science Internship · Task 6</footer>
+
+<script>
+const DATA = {{PAYLOAD}};
+const lookup = new Map(DATA.titles.map((t, i) => [t.toLowerCase(), i]));
+const list = document.getElementById("titles");
+const out = document.getElementById("recs");
+const input = document.getElementById("q");
+const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+input.addEventListener("input", () => {
+  const q = input.value.trim().toLowerCase();
+  if (q.length >= 2) {
+    const hits = [];
+    for (const t of DATA.titles) { if (t.toLowerCase().includes(q)) { hits.push(t); if (hits.length >= 20) break; } }
+    list.innerHTML = hits.map(t => `<option value="${esc(t)}">`).join("");
+  }
+  const i = lookup.get(q);
+  if (i === undefined) { out.innerHTML = q ? "<li><small>Pick a title from the list…</small></li>" : ""; return; }
+  out.innerHTML = DATA.recs[i].map((j, k) =>
+    `<li><div>${esc(DATA.titles[j])}<small>${esc(DATA.meta[j])}</small></div><span class="score">${Math.round(DATA.scores[i][k] * 100)}% match</span></li>`
+  ).join("");
+});
+</script>
+</body>
+</html>
